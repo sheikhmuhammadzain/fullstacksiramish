@@ -1,7 +1,4 @@
 import "./App.css";
-import axios from "axios";
-import { useEffect } from "react";
-import { useRef } from "react";
 import {
   BrowserRouter as Router,
   Routes,
@@ -14,9 +11,6 @@ import Home from "./components/Home";
 import ProtectedRoute from "./components/ProtectedRoute";
 
 function App() {
-  const emailRef = useRef(null);
-  const passwordRef = useRef(null);
-
   return (
     <Router>
       <Routes>

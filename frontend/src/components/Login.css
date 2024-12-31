@@ -1,5 +1,5 @@
 * {
-  font-family: 'Courier New', Courier, monospace;
+  font-family: "Courier New", Courier, monospace;
 }
 
 .login-container {
@@ -76,4 +76,4 @@
 
 .signup-link a:hover {
   text-decoration: underline;
-} 
+}

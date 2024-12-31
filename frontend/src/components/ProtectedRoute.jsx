@@ -30,7 +30,6 @@ const ProtectedRoute = ({ children }) => {
     const currentTime = Date.now() / 1000;
 
     if (decodedToken.exp < currentTime) {
-      // Changed to await the async function
       const newToken =  refreshAccess();
       if (!newToken) {
         return <Navigate to="/login" replace />;

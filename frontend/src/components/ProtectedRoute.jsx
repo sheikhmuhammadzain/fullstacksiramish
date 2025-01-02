@@ -1,81 +1,66 @@
-import React, { useEffect, useState } from 'react';
-import { Navigate } from 'react-router-dom';
-import { jwtDecode } from 'jwt-decode';
-import axios from 'axios';
+/* eslint-disable react/prop-types */
+import {useEffect, useState} from "react"
+import {Navigate} from "react-router-dom"
+import jwtDecode from "jwt-decode"
+import axios from "axios"
 
-/**
- * ProtectedRoute Component - Protects routes that require authentication
- * Checks if user is authenticated and manages token refresh
- */
-const ProtectedRoute = ({ children }) => {
-  // State to track authentication and loading status
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
+const ProtectedRoute = ({children}) => {
+  const [user, setUser] = useState(null) // null for initial loading state
 
-  // Check if access token is valid
-  const isTokenValid = (token) => {
+  // Function to refresh the access token
+  const refreshToken = async () => {
     try {
-      const { exp } = jwtDecode(token);
-      return exp * 1000 > Date.now();
+      const response = await axios.post(
+        "http://localhost:8000/api/token/refresh/",
+        {
+          refresh: localStorage.getItem("refresh"),
+        }
+      )
+      localStorage.setItem("access", response.data.access)
+      console.log("Access token refreshed")
+      setUser(true) // Token refreshed, user is authenticated
     } catch (error) {
-      console.error('Error checking token validity:', error);
-      return false;
+      console.error("Error refreshing token:", error)
+      setUser(false) // Unable to refresh, user is not authenticated
     }
-  };
-
-  // Get new access token using refresh token
-  const refreshAccessToken = async () => {
-    const refreshToken = localStorage.getItem('refresh_token');
-    if (!refreshToken) return false;
-
-    try {
-      const response = await axios.post('http://localhost:8000/api/token/refresh/', {
-        refresh: refreshToken
-      });
-      
-      localStorage.setItem('access_token', response.data.access);
-      return true;
-    } catch (error) {
-      console.error('Error refreshing token:', error);
-      return false;
-    }
-  };
-
-  // Main authentication check
-  useEffect(() => {
-    const checkAuthentication = async () => {
-      const accessToken = localStorage.getItem('access_token');
-
-      // Case 1: No access token exists
-      if (!accessToken) {
-        setIsAuthenticated(false);
-        setIsLoading(false);
-        return;
-      }
-
-      // Case 2: Access token is still valid
-      if (isTokenValid(accessToken)) {
-        setIsAuthenticated(true);
-        setIsLoading(false);
-        return;
-      }
-
-      // Case 3: Access token expired, try to refresh
-      const refreshSuccessful = await refreshAccessToken();
-      setIsAuthenticated(refreshSuccessful);
-      setIsLoading(false);
-    };
-
-    checkAuthentication();
-  }, []);
-
-  // Show loading screen while checking authentication
-  if (isLoading) {
-    return <div>Loading...</div>;
   }
 
-  // Either show protected content or redirect to login
-  return isAuthenticated ? children : <Navigate to="/login" />;
-};
+  // Effect to check token validity on component mount
+  useEffect(() => {
+    const checkTokenValidity = async () => {
+      const token = localStorage.getItem("access")
+      const refresh = localStorage.getItem("refresh")
 
-export default ProtectedRoute;
+      if (token) {
+        try {
+          const {exp} = jwtDecode(token)
+          if (exp * 1000 < Date.now()) {
+            // Token expired, attempt to refresh
+            if (refresh) {
+              await refreshToken()
+            } else {
+              setUser(false) // No refresh token available
+            }
+          } else {
+            setUser(true) // Token is valid
+          }
+        } catch (error) {
+          console.error("Error decoding token:", error)
+          setUser(false) // Invalid token
+        }
+      } else {
+        setUser(false) // No access token available
+      }
+    }
+
+    checkTokenValidity()
+  }, []) // Runs only once on component mount
+
+  if (user === null) {
+    return <div>Loading...</div> // Show loading state while checking authentication
+  }
+
+  return user ? children : <Navigate to="/login" /> // Redirect to login if not authenticated
+}
+
+export default ProtectedRoute

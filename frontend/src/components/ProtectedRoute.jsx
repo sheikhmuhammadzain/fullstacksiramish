@@ -1,66 +1,72 @@
 /* eslint-disable react/prop-types */
-import {useEffect, useState} from "react"
-import {Navigate} from "react-router-dom"
-import jwtDecode from "jwt-decode"
-import axios from "axios"
+import axios from "axios";
+import { jwtDecode } from "jwt-decode";
+import { useEffect, useState } from "react";
+import { Navigate } from "react-router-dom";
 
-const ProtectedRoute = ({children}) => {
-  const [user, setUser] = useState(null) // null for initial loading state
+const DemoProtectedRoute = ({ children }) => {
+  const [user, setUser] = useState(null);
 
-  // Function to refresh the access token
-  const refreshToken = async () => {
+  // Renamed to avoid naming conflict
+  async function handleTokenRefresh() {
     try {
-      const response = await axios.post(
-        "http://localhost:8000/api/token/refresh/",
-        {
-          refresh: localStorage.getItem("refresh"),
-        }
-      )
-      localStorage.setItem("access", response.data.access)
-      console.log("Access token refreshed")
-      setUser(true) // Token refreshed, user is authenticated
+      const refreshToken = localStorage.getItem("refresh_token");
+      if (!refreshToken) {
+        setUser(false);
+        return;
+      }
+
+      const res = await axios.post("http://127.0.0.1:8000/api/token/refresh/", {
+        refresh: refreshToken,
+      });
+
+      if (res.data.access) {
+        localStorage.setItem("access_token", res.data.access);
+        setUser(true);
+      } else {
+        setUser(false);
+      }
     } catch (error) {
-      console.error("Error refreshing token:", error)
-      setUser(false) // Unable to refresh, user is not authenticated
+      console.error("Error refreshing token:", error);
+      setUser(false);
+      localStorage.removeItem("access_token");
+      localStorage.removeItem("refresh_token");
     }
   }
 
-  // Effect to check token validity on component mount
   useEffect(() => {
-    const checkTokenValidity = async () => {
-      const token = localStorage.getItem("access")
-      const refresh = localStorage.getItem("refresh")
+    async function checkTokenValidity() {
+      const accessToken = localStorage.getItem("access_token");
+      
+      if (!accessToken) {
+        setUser(false);
+        return;
+      }
 
-      if (token) {
-        try {
-          const {exp} = jwtDecode(token)
-          if (exp * 1000 < Date.now()) {
-            // Token expired, attempt to refresh
-            if (refresh) {
-              await refreshToken()
-            } else {
-              setUser(false) // No refresh token available
-            }
-          } else {
-            setUser(true) // Token is valid
-          }
-        } catch (error) {
-          console.error("Error decoding token:", error)
-          setUser(false) // Invalid token
+      try {
+        const { exp } = jwtDecode(accessToken);
+        
+        if (exp * 1000 < Date.now()) {
+          // Token has expired, try to refresh
+          await handleTokenRefresh();
+        } else {
+          // Token is still valid
+          setUser(true);
         }
-      } else {
-        setUser(false) // No access token available
+      } catch (error) {
+        console.error("Error decoding token:", error);
+        setUser(false);
       }
     }
 
-    checkTokenValidity()
-  }, []) // Runs only once on component mount
+    checkTokenValidity();
+  }, []);
 
   if (user === null) {
-    return <div>Loading...</div> // Show loading state while checking authentication
+    return <div>Loading...</div>;
   }
 
-  return user ? children : <Navigate to="/login" /> // Redirect to login if not authenticated
-}
+  return user ? children : <Navigate to="/login" replace />;
+};
 
-export default ProtectedRoute
+export default DemoProtectedRoute;

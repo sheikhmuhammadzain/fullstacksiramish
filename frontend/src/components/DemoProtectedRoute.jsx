@@ -1,51 +1,45 @@
-/* eslint-disable react/prop-types */
 import axios from "axios"
 import {jwtDecode} from "jwt-decode"
 import {useEffect, useState} from "react"
 import {Navigate} from "react-router-dom"
 
 const DemoProtectedRoute = ({children}) => {
-  const [user, setuser] = useState(null)
+  const [User, setUser] = useState(null)
 
-  async function refreshToken() {
+  useEffect(() => {
+    async function checkTokenValidity() {
+      const access = localStorage.getItem("access_token")
+      if (!access) {
+        setUser(false)
+        return
+      }
+      const {exp} = jwtDecode(access)
+      if (exp * 1000 < Date.now()) {
+        await handleRefresh()
+      } else {
+        setUser(true)
+      }
+    }
+    checkTokenValidity()
+  }, [])
+
+  async function handleRefresh() {
     try {
       const res = await axios.post("http://127.0.0.1:8000/api/token/refresh/", {
         refresh: localStorage.getItem("refresh_token"),
       })
       localStorage.setItem("access_token", res.data.access)
-      setuser(true)
+      setUser(true)
     } catch (error) {
-      alert("error fetching the user ", error)
-      setuser(false)
+      setUser(false)
+      localStorage.clear()
     }
   }
 
-  async function checkTokenValidity() {
-    const accessToken = localStorage.getItem("access_token")
-    const refreshToken = localStorage.getItem("refresh_token")
-    if (accessToken) {
-      const {exp} = jwtDecode(accessToken)
-      if (exp * 1000 < Date.now()) {
-        if (refreshToken) {
-          await refreshToken()
-        } else {
-          setuser(false)
-        }
-        setuser(true)
-      } else {
-        setuser(false)
-      }
-    } else {
-      setuser(false)
-    }
+  if (User === null) {
+    return <p>Loading</p>
   }
-  useEffect(() => checkTokenValidity(), [])
-
-  if (user === null) {
-    return <div>Loading</div>
-  }
-
-  return user ? children : <Navigate to="/login" />
+  return User ? children : <Navigate to="/login" replace />
 }
 
 export default DemoProtectedRoute
